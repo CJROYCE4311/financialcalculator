@@ -10,6 +10,8 @@ import { createPensionSlice } from './slices/pension-slice'
 import { createBudgetSlice } from './slices/budget-slice'
 import { createMonteCarloSlice } from './slices/monte-carlo-slice'
 import { createNarrativeSlice } from './slices/narrative-slice'
+// Initialize and validate localStorage before creating store
+import '@/lib/utils/storage-init'
 
 /**
  * Custom serializer/deserializer for Decimal.js values in LocalStorage
@@ -81,16 +83,19 @@ function deserializeDecimals(obj: any): any {
  */
 const decimalAwareStorage = {
   getItem: (name: string): string | null => {
-    const item = localStorage.getItem(name)
-    if (!item) return null
+    // Safety check: only run on client side
+    if (typeof window === 'undefined') return null
 
     try {
+      const item = localStorage.getItem(name)
+      if (!item) return null
+
       // Parse from localStorage
       const parsed = JSON.parse(item)
 
-      // Validate the parsed data structure
-      if (!parsed || typeof parsed !== 'object' || !parsed.state) {
-        console.warn('Invalid localStorage data structure, clearing...')
+      // Basic validation - check if it's an object
+      if (!parsed || typeof parsed !== 'object') {
+        console.warn('⚠️ localStorage data is not an object, clearing...')
         localStorage.removeItem(name)
         return null
       }
@@ -110,10 +115,11 @@ const decimalAwareStorage = {
         return value
       })
     } catch (error) {
-      console.error('Error loading from storage, clearing corrupt data:', error)
+      console.error('❌ Error loading from storage, clearing corrupt data:', error)
       // Clear corrupt data automatically
       try {
         localStorage.removeItem(name)
+        console.log('✅ Corrupt data cleared - will start with fresh state')
       } catch (clearError) {
         console.error('Failed to clear corrupt data:', clearError)
       }
@@ -121,6 +127,9 @@ const decimalAwareStorage = {
     }
   },
   setItem: (name: string, value: string): void => {
+    // Safety check: only run on client side
+    if (typeof window === 'undefined') return
+
     try {
       // createJSONStorage stringifies before calling this
       const parsed = JSON.parse(value)
@@ -128,11 +137,18 @@ const decimalAwareStorage = {
       const serialized = serializeDecimals(parsed)
       localStorage.setItem(name, JSON.stringify(serialized))
     } catch (error) {
-      console.error('Error saving to storage:', error)
+      console.error('❌ Error saving to storage:', error)
     }
   },
   removeItem: (name: string): void => {
-    localStorage.removeItem(name)
+    // Safety check: only run on client side
+    if (typeof window === 'undefined') return
+
+    try {
+      localStorage.removeItem(name)
+    } catch (error) {
+      console.error('❌ Error removing from storage:', error)
+    }
   },
 }
 
@@ -194,24 +210,36 @@ export const useCalculatorStore = create<CalculatorStore>()(
       version: 1,
       storage: createJSONStorage(() => decimalAwareStorage),
       // Hydrate Decimals after loading from storage
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        // Handle rehydration errors
+        if (error) {
+          console.error('❌ Rehydration error:', error)
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('financial-calculator-storage')
+              console.log('✅ Corrupt data cleared - starting fresh')
+            } catch (e) {
+              console.error('Failed to clear storage:', e)
+            }
+          }
+          return
+        }
+
         if (state) {
           try {
             // Recursively hydrate all Decimal values
             const hydrated = hydrateDecimals(state)
             Object.assign(state, hydrated)
-            console.log('✅ Successfully rehydrated calculator state from localStorage')
-          } catch (error) {
-            console.error('❌ Error rehydrating state from localStorage:', error)
-            console.warn('🧹 Clearing corrupt localStorage data...')
-            // Clear the corrupt data to prevent app crashes
-            try {
-              localStorage.removeItem('financial-calculator-storage')
-              console.log('✅ Corrupt data cleared. Page will reload with fresh state.')
-              // Reload to start fresh
-              window.location.reload()
-            } catch (clearError) {
-              console.error('Failed to clear localStorage:', clearError)
+            console.log('✅ Successfully rehydrated calculator state')
+          } catch (hydrateError) {
+            console.error('❌ Error hydrating Decimals:', hydrateError)
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('financial-calculator-storage')
+                console.log('✅ Cleared corrupt data - please refresh')
+              } catch (e) {
+                console.error('Failed to clear storage:', e)
+              }
             }
           }
         }
