@@ -90,20 +90,138 @@ export default function Home() {
                 Comprehensive tools to model your retirement, analyze investments,
                 and build a sustainable financial strategy.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <p className="text-lg text-white/80 mb-8">
+                Choose your planning approach:
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Two Path Options */}
+        <section className="py-16 px-4 bg-white">
+          <div className="container mx-auto max-w-6xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Path 1: Unified All-in-One */}
+              <div className="group relative bg-gradient-to-br from-accent/5 to-accent/10 border-2 border-accent/20 rounded-xl p-8 hover:shadow-2xl transition-all duration-300 hover:border-accent">
+                <div className="absolute top-4 right-4 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full">
+                  FASTEST
+                </div>
+                <div className="text-5xl mb-4">🎯</div>
+                <h2 className="text-2xl font-serif font-bold text-primary mb-3">
+                  All-in-One Planner
+                </h2>
+                <p className="text-gray-600 mb-6">
+                  Complete your entire financial plan on a single page. Perfect for those who
+                  want a quick, comprehensive overview.
+                </p>
+
+                <div className="mb-6">
+                  <h3 className="font-semibold text-sm text-gray-700 mb-2">What's included:</h3>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-start">
+                      <span className="text-accent mr-2">✓</span>
+                      <span>Investment & asset allocation</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-accent mr-2">✓</span>
+                      <span>Retirement withdrawals & timeline</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-accent mr-2">✓</span>
+                      <span>Social Security & pension income</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-accent mr-2">✓</span>
+                      <span>Budget & cash flow analysis</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mb-6 p-4 bg-white/50 rounded-lg border border-accent/20">
+                  <p className="text-sm text-gray-700">
+                    <strong className="text-accent">Time:</strong> 10-15 minutes •
+                    <strong className="text-accent ml-2">Next step:</strong> Monte Carlo simulation
+                  </p>
+                </div>
+
                 <Link
                   href="/calculators/unified"
-                  className="bg-accent hover:bg-accent/90 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                  className="block w-full text-center bg-accent hover:bg-accent/90 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 shadow-lg hover:shadow-xl group-hover:scale-105"
                 >
-                  Start Complete Planning
+                  Start All-in-One Plan →
                 </Link>
-                <a
-                  href="#calculators"
-                  className="bg-white/10 hover:bg-white/20 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 border-2 border-white/30"
-                >
-                  Explore Individual Tools
-                </a>
               </div>
+
+              {/* Path 2: Step-by-Step Guided */}
+              <div className="group relative bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-8 hover:shadow-2xl transition-all duration-300 hover:border-blue-500">
+                <div className="absolute top-4 right-4 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  DETAILED
+                </div>
+                <div className="text-5xl mb-4">📊</div>
+                <h2 className="text-2xl font-serif font-bold text-primary mb-3">
+                  Step-by-Step Workflow
+                </h2>
+                <p className="text-gray-600 mb-6">
+                  Build your plan gradually with guided navigation through each calculator.
+                  Detailed analysis and insights at every step.
+                </p>
+
+                <div className="mb-6">
+                  <h3 className="font-semibold text-sm text-gray-700 mb-2">7-step workflow:</h3>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-start">
+                      <span className="text-blue-600 mr-2 font-bold">1.</span>
+                      <span>Investment projection & growth</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-600 mr-2 font-bold">2.</span>
+                      <span>Retirement withdrawal strategy</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-600 mr-2 font-bold">3.</span>
+                      <span>Social Security benefits</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-600 mr-2 font-bold">4.</span>
+                      <span>Pension & annuity income</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-600 mr-2 font-bold">5.</span>
+                      <span>Budget & cash flow → 6. Monte Carlo → 7. Narrative</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mb-6 p-4 bg-white/50 rounded-lg border border-blue-300">
+                  <p className="text-sm text-gray-700">
+                    <strong className="text-blue-600">Time:</strong> 20-30 minutes •
+                    <strong className="text-blue-600 ml-2">Benefit:</strong> Comprehensive insights
+                  </p>
+                </div>
+
+                <Link
+                  href="/calculators/investment-projection"
+                  className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 shadow-lg hover:shadow-xl group-hover:scale-105"
+                >
+                  Start Step 1: Investment →
+                </Link>
+              </div>
+            </div>
+
+            {/* Or browse all */}
+            <div className="text-center mt-12">
+              <p className="text-gray-600 mb-4">
+                Or browse individual calculators below
+              </p>
+              <a
+                href="#calculators"
+                className="inline-flex items-center gap-2 text-primary hover:text-accent font-semibold transition-colors"
+              >
+                <span>View All Calculators</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </a>
             </div>
           </div>
         </section>
@@ -138,15 +256,15 @@ export default function Home() {
         </section>
 
         {/* Calculators Grid */}
-        <section id="calculators" className="py-16 px-4">
+        <section id="calculators" className="py-16 px-4 bg-section">
           <div className="container mx-auto max-w-7xl">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-serif font-bold text-primary mb-4">
-                Financial Calculators
+                All Financial Calculators
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Nine interconnected tools that work together to create your complete
-                retirement plan.
+                Browse and jump to any individual calculator, or use our guided workflows above
+                for a structured approach.
               </p>
             </div>
 
