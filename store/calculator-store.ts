@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import Decimal from 'decimal.js'
 import type { CalculatorStore } from '@/types/calculator.types'
+import { hydrateDecimals } from '@/lib/utils/decimal-helpers'
 import { createInvestmentSlice } from './slices/investment-slice'
 import { createWithdrawalSlice } from './slices/withdrawal-slice'
 import { createSocialSecuritySlice } from './slices/social-security-slice'
@@ -178,6 +179,14 @@ export const useCalculatorStore = create<CalculatorStore>()(
       name: 'financial-calculator-storage',
       version: 1,
       storage: createJSONStorage(() => decimalAwareStorage),
+      // Hydrate Decimals after loading from storage
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Recursively hydrate all Decimal values
+          const hydrated = hydrateDecimals(state)
+          Object.assign(state, hydrated)
+        }
+      },
       // Partial persistence - only persist inputs and results, not UI state
       partialize: (state) => ({
         investmentProjection: state.investmentProjection,
