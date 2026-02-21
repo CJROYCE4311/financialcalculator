@@ -87,6 +87,14 @@ const decimalAwareStorage = {
     try {
       // Parse from localStorage
       const parsed = JSON.parse(item)
+
+      // Validate the parsed data structure
+      if (!parsed || typeof parsed !== 'object' || !parsed.state) {
+        console.warn('Invalid localStorage data structure, clearing...')
+        localStorage.removeItem(name)
+        return null
+      }
+
       // Deserialize Decimals from {__decimal: "123"} format
       const withDecimals = deserializeDecimals(parsed)
 
@@ -102,7 +110,13 @@ const decimalAwareStorage = {
         return value
       })
     } catch (error) {
-      console.error('Error loading from storage:', error)
+      console.error('Error loading from storage, clearing corrupt data:', error)
+      // Clear corrupt data automatically
+      try {
+        localStorage.removeItem(name)
+      } catch (clearError) {
+        console.error('Failed to clear corrupt data:', clearError)
+      }
       return null
     }
   },
@@ -182,9 +196,24 @@ export const useCalculatorStore = create<CalculatorStore>()(
       // Hydrate Decimals after loading from storage
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Recursively hydrate all Decimal values
-          const hydrated = hydrateDecimals(state)
-          Object.assign(state, hydrated)
+          try {
+            // Recursively hydrate all Decimal values
+            const hydrated = hydrateDecimals(state)
+            Object.assign(state, hydrated)
+            console.log('✅ Successfully rehydrated calculator state from localStorage')
+          } catch (error) {
+            console.error('❌ Error rehydrating state from localStorage:', error)
+            console.warn('🧹 Clearing corrupt localStorage data...')
+            // Clear the corrupt data to prevent app crashes
+            try {
+              localStorage.removeItem('financial-calculator-storage')
+              console.log('✅ Corrupt data cleared. Page will reload with fresh state.')
+              // Reload to start fresh
+              window.location.reload()
+            } catch (clearError) {
+              console.error('Failed to clear localStorage:', clearError)
+            }
+          }
         }
       },
       // Partial persistence - only persist inputs and results, not UI state
@@ -203,15 +232,46 @@ export const useCalculatorStore = create<CalculatorStore>()(
       }),
       // Handle version migrations if needed
       migrate: (persistedState: any, version: number) => {
-        if (version === 0) {
-          // Migration from version 0 to 1 (if needed in future)
-          // For now, just return the persisted state
+        try {
+          if (version < 1) {
+            // Migration from version 0 to 1
+            console.log(`🔄 Migrating storage from version ${version} to version 1`)
+            // Clear old data that doesn't match current schema
+            // In future versions, add specific migration logic here
+            return persistedState as CalculatorStore
+          }
+          return persistedState as CalculatorStore
+        } catch (error) {
+          console.error('❌ Migration failed:', error)
+          console.warn('🧹 Clearing incompatible data...')
+          // Return undefined to trigger fresh state
+          return undefined as any
         }
-        return persistedState as CalculatorStore
       },
     }
   )
 )
+
+/**
+ * Utility function to clear all calculator data from localStorage
+ * Can be called from browser console if needed: window.clearCalculatorStorage()
+ */
+export function clearCalculatorStorage() {
+  try {
+    localStorage.removeItem('financial-calculator-storage')
+    console.log('✅ Calculator storage cleared successfully')
+    console.log('🔄 Reload the page to start with fresh state')
+    return true
+  } catch (error) {
+    console.error('❌ Failed to clear calculator storage:', error)
+    return false
+  }
+}
+
+// Expose to window for debugging in production
+if (typeof window !== 'undefined') {
+  (window as any).clearCalculatorStorage = clearCalculatorStorage
+}
 
 /**
  * Selector hooks for better performance
