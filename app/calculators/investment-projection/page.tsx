@@ -263,7 +263,9 @@ export default function InvestmentProjectionPage() {
                         <p>
                           <strong>Contribution rate:</strong>{' '}
                           {formatCurrency(inputs.annualInvestment)} per year
-                          {inputs.employerMatchAmount.greaterThan(0) && (
+                          {(inputs.employerMatchAmount instanceof Decimal
+                            ? inputs.employerMatchAmount.greaterThan(0)
+                            : Number(inputs.employerMatchAmount) > 0) && (
                             <span> (+ {formatCurrency(inputs.employerMatchAmount, { showCents: false })} employer match)</span>
                           )}
                         </p>

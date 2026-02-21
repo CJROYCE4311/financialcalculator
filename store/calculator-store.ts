@@ -75,19 +75,31 @@ function deserializeDecimals(obj: any): any {
 }
 
 /**
- * Custom storage with Decimal serialization
+ * Custom storage that handles Decimal serialization properly
+ * This storage is used by createJSONStorage, which expects string in/out
  */
-const customStorage = {
+const decimalAwareStorage = {
   getItem: (name: string): string | null => {
     const item = localStorage.getItem(name)
     if (!item) return null
 
     try {
-      // Parse the stored JSON and deserialize Decimal objects
+      // Parse from localStorage
       const parsed = JSON.parse(item)
-      const deserialized = deserializeDecimals(parsed)
-      // Return as JSON string for zustand
-      return JSON.stringify(deserialized)
+      // Deserialize Decimals from {__decimal: "123"} format
+      const withDecimals = deserializeDecimals(parsed)
+
+      // IMPORTANT: createJSONStorage will parse this again,
+      // so we need to use a custom replacer to preserve Decimals
+      return JSON.stringify(withDecimals, (key, value) => {
+        if (value instanceof Decimal) {
+          return { __decimal: value.toString() }
+        }
+        if (value instanceof Date) {
+          return { __date: value.toISOString() }
+        }
+        return value
+      })
     } catch (error) {
       console.error('Error loading from storage:', error)
       return null
@@ -95,8 +107,9 @@ const customStorage = {
   },
   setItem: (name: string, value: string): void => {
     try {
-      // Parse the value, serialize Decimals, and store
+      // createJSONStorage stringifies before calling this
       const parsed = JSON.parse(value)
+      // Serialize Decimals to {__decimal: "123"} format
       const serialized = serializeDecimals(parsed)
       localStorage.setItem(name, JSON.stringify(serialized))
     } catch (error) {
@@ -164,7 +177,7 @@ export const useCalculatorStore = create<CalculatorStore>()(
     {
       name: 'financial-calculator-storage',
       version: 1,
-      storage: createJSONStorage(() => customStorage),
+      storage: createJSONStorage(() => decimalAwareStorage),
       // Partial persistence - only persist inputs and results, not UI state
       partialize: (state) => ({
         investmentProjection: state.investmentProjection,
