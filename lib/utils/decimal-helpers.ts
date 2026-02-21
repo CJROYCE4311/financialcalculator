@@ -68,3 +68,30 @@ export function hydrateDecimals<T>(obj: T): T {
 
   return obj
 }
+
+/**
+ * Mutate an object in place to convert all Decimal-like objects to proper Decimals
+ * This is useful for Zustand rehydration where we need to mutate the state object
+ */
+export function hydrateDecimalsInPlace(obj: any): void {
+  if (!obj || typeof obj !== 'object') {
+    return
+  }
+
+  for (const key in obj) {
+    const value = obj[key]
+
+    if (value === null || value === undefined) {
+      continue
+    }
+
+    // Check if it's a serialized Decimal
+    if (typeof value === 'object' && '__decimal' in value) {
+      obj[key] = new Decimal(value.__decimal)
+    }
+    // Recursively process nested objects and arrays
+    else if (typeof value === 'object') {
+      hydrateDecimalsInPlace(value)
+    }
+  }
+}

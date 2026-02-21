@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import Decimal from 'decimal.js'
 import type { CalculatorStore } from '@/types/calculator.types'
-import { hydrateDecimals } from '@/lib/utils/decimal-helpers'
+import { hydrateDecimals, hydrateDecimalsInPlace } from '@/lib/utils/decimal-helpers'
 import { createInvestmentSlice } from './slices/investment-slice'
 import { createWithdrawalSlice } from './slices/withdrawal-slice'
 import { createSocialSecuritySlice } from './slices/social-security-slice'
@@ -227,10 +227,10 @@ export const useCalculatorStore = create<CalculatorStore>()(
 
         if (state) {
           try {
-            // Recursively hydrate all Decimal values
-            const hydrated = hydrateDecimals(state)
-            Object.assign(state, hydrated)
-            console.log('✅ Successfully rehydrated calculator state')
+            // Recursively hydrate all Decimal values IN PLACE
+            // This mutates the state object directly to convert {__decimal: "123"} to Decimal objects
+            hydrateDecimalsInPlace(state)
+            console.log('✅ Successfully rehydrated calculator state with Decimal objects')
           } catch (hydrateError) {
             console.error('❌ Error hydrating Decimals:', hydrateError)
             if (typeof window !== 'undefined') {
