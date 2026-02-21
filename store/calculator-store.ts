@@ -90,7 +90,7 @@ const decimalAwareStorage = {
       const item = localStorage.getItem(name)
       if (!item) return null
 
-      // Parse from localStorage
+      // Parse to validate it's valid JSON
       const parsed = JSON.parse(item)
 
       // Basic validation - check if it's an object
@@ -100,20 +100,9 @@ const decimalAwareStorage = {
         return null
       }
 
-      // Deserialize Decimals from {__decimal: "123"} format
-      const withDecimals = deserializeDecimals(parsed)
-
-      // IMPORTANT: createJSONStorage will parse this again,
-      // so we need to use a custom replacer to preserve Decimals
-      return JSON.stringify(withDecimals, (key, value) => {
-        if (value instanceof Decimal) {
-          return { __decimal: value.toString() }
-        }
-        if (value instanceof Date) {
-          return { __date: value.toISOString() }
-        }
-        return value
-      })
+      // Just return the raw string - let onRehydrateStorage handle Decimal conversion
+      // This avoids double serialization/deserialization issues
+      return item
     } catch (error) {
       console.error('❌ Error loading from storage, clearing corrupt data:', error)
       // Clear corrupt data automatically
@@ -155,7 +144,7 @@ const decimalAwareStorage = {
 /**
  * Main calculator store combining all slices
  */
-export const useCalculatorStore = create<CalculatorStore>()(
+const store = create<CalculatorStore>()(
   persist(
     (...args) => ({
       // Combine all slices
@@ -227,9 +216,24 @@ export const useCalculatorStore = create<CalculatorStore>()(
 
         if (state) {
           try {
+            console.log('🔄 Starting Decimal hydration...')
+
+            // Check state before hydration
+            if ((state as any).investmentProjection?.inputs?.equities) {
+              const eq = (state as any).investmentProjection.inputs.equities
+              console.log('Before hydration - equities type:', typeof eq, 'isDecimal:', eq instanceof Decimal, 'value:', eq)
+            }
+
             // Recursively hydrate all Decimal values IN PLACE
             // This mutates the state object directly to convert {__decimal: "123"} to Decimal objects
             hydrateDecimalsInPlace(state)
+
+            // Check state after hydration
+            if ((state as any).investmentProjection?.inputs?.equities) {
+              const eq = (state as any).investmentProjection.inputs.equities
+              console.log('After hydration - equities type:', typeof eq, 'isDecimal:', eq instanceof Decimal, 'value:', eq)
+            }
+
             console.log('✅ Successfully rehydrated calculator state with Decimal objects')
           } catch (hydrateError) {
             console.error('❌ Error hydrating Decimals:', hydrateError)
@@ -302,11 +306,16 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Export the main store hook
+ */
+export const useCalculatorStore = store
+
+/**
  * Selector hooks for better performance
  * These allow components to subscribe to specific slices
  */
 export const useInvestmentProjection = () =>
-  useCalculatorStore((state) => state.investmentProjection)
+  store((state) => state.investmentProjection)
 
 export const useRetirementWithdrawal = () =>
   useCalculatorStore((state) => state.retirementWithdrawal)
