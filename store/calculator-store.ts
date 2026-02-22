@@ -56,6 +56,7 @@ function serializeDecimals(obj: any): any {
 
 /**
  * Recursively convert serialized decimal strings back to Decimal objects
+ * Also handles legacy formats (plain strings/numbers) for backward compatibility
  */
 function deserializeDecimals(obj: any): any {
   if (obj && typeof obj === 'object') {
@@ -78,6 +79,29 @@ function deserializeDecimals(obj: any): any {
 }
 
 /**
+ * Check if data is in old format (plain strings/numbers instead of {__decimal: "123"})
+ */
+function isOldFormat(state: any): boolean {
+  try {
+    // Check if investment inputs have Decimal values
+    const balance = state?.state?.investmentProjection?.inputs?.currentBalance
+    if (balance !== undefined && balance !== null) {
+      // Old format: plain string or number
+      // New format: {__decimal: "123"} or Decimal object
+      if (typeof balance === 'string' || typeof balance === 'number') {
+        return true
+      }
+      if (!(balance instanceof Decimal) && !balance.__decimal) {
+        return true
+      }
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
  * Custom storage that handles Decimal serialization properly
  * This implements the storage interface directly without using createJSONStorage
  * to avoid the double-serialization issue
@@ -97,6 +121,14 @@ const decimalAwareStorage = {
       // Basic validation - check if it's an object
       if (!parsed || typeof parsed !== 'object') {
         console.warn('⚠️ localStorage data is not an object, clearing...')
+        localStorage.removeItem(name)
+        return null
+      }
+
+      // Check for old format data (pre-v2)
+      if (isOldFormat(parsed)) {
+        console.warn('⚠️ Detected old format data from previous version')
+        console.log('🔄 Clearing old data - will start with fresh state')
         localStorage.removeItem(name)
         return null
       }
@@ -210,7 +242,7 @@ const store = create<CalculatorStore>()(
     }),
     {
       name: 'financial-calculator-storage',
-      version: 1,
+      version: 2, // Bumped to v2 to clear old format data from production
       // Use our custom storage directly (not wrapped in createJSONStorage)
       // This way we control the serialization/deserialization of Decimals
       storage: decimalAwareStorage,
@@ -236,6 +268,16 @@ const store = create<CalculatorStore>()(
             console.log('✅ State rehydrated successfully with Decimal objects')
           } else {
             console.error('❌ Decimal hydration failed - currentBalance type:', typeof balance, balance)
+            console.warn('🧹 Clearing incompatible data...')
+            // Clear the bad data
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('financial-calculator-storage')
+                console.log('✅ Incompatible data cleared - please reload the page')
+              } catch (e) {
+                console.error('Failed to clear storage:', e)
+              }
+            }
           }
         }
       },
@@ -263,12 +305,15 @@ const store = create<CalculatorStore>()(
       // Handle version migrations if needed
       migrate: (persistedState: any, version: number) => {
         try {
-          if (version < 1) {
-            // Migration from version 0 to 1
-            console.log(`🔄 Migrating storage from version ${version} to version 1`)
-            // Clear old data that doesn't match current schema
-            // In future versions, add specific migration logic here
-            return persistedState as CalculatorStore
+          if (version < 2) {
+            // Migration from version 0/1 to 2
+            // Version 2 introduces proper Decimal serialization format
+            // Old versions stored Decimals as plain strings/numbers
+            console.warn(`⚠️ Migrating from version ${version} to version 2`)
+            console.log('🧹 Clearing old format data to prevent type errors')
+            console.log('💡 Your calculator will start fresh with correct data types')
+            // Return undefined to clear old data and start fresh
+            return undefined as any
           }
           return persistedState as CalculatorStore
         } catch (error) {
