@@ -1,8 +1,8 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
 import Decimal from 'decimal.js'
 import type { CalculatorStore } from '@/types/calculator.types'
-import { hydrateDecimals, hydrateDecimalsInPlace } from '@/lib/utils/decimal-helpers'
+import { hydrateDecimals } from '@/lib/utils/decimal-helpers'
 import { createInvestmentSlice } from './slices/investment-slice'
 import { createWithdrawalSlice } from './slices/withdrawal-slice'
 import { createSocialSecuritySlice } from './slices/social-security-slice'
@@ -79,10 +79,11 @@ function deserializeDecimals(obj: any): any {
 
 /**
  * Custom storage that handles Decimal serialization properly
- * This storage is used by createJSONStorage, which expects string in/out
+ * This implements the storage interface directly without using createJSONStorage
+ * to avoid the double-serialization issue
  */
 const decimalAwareStorage = {
-  getItem: (name: string): string | null => {
+  getItem: (name: string) => {
     // Safety check: only run on client side
     if (typeof window === 'undefined') return null
 
@@ -90,7 +91,7 @@ const decimalAwareStorage = {
       const item = localStorage.getItem(name)
       if (!item) return null
 
-      // Parse to validate it's valid JSON
+      // Parse the stored data
       const parsed = JSON.parse(item)
 
       // Basic validation - check if it's an object
@@ -100,9 +101,12 @@ const decimalAwareStorage = {
         return null
       }
 
-      // Just return the raw string - let onRehydrateStorage handle Decimal conversion
-      // This avoids double serialization/deserialization issues
-      return item
+      // Deserialize Decimals from {__decimal: "123"} format to Decimal objects
+      // This happens during load, before zustand sets the state
+      const deserialized = deserializeDecimals(parsed)
+
+      // Return the deserialized object (not a string!)
+      return deserialized
     } catch (error) {
       console.error('❌ Error loading from storage, clearing corrupt data:', error)
       // Clear corrupt data automatically
@@ -115,18 +119,28 @@ const decimalAwareStorage = {
       return null
     }
   },
-  setItem: (name: string, value: string): void => {
+  setItem: (name: string, value: any): void => {
     // Safety check: only run on client side
     if (typeof window === 'undefined') return
 
     try {
-      // createJSONStorage stringifies before calling this
-      const parsed = JSON.parse(value)
-      // Serialize Decimals to {__decimal: "123"} format
-      const serialized = serializeDecimals(parsed)
-      localStorage.setItem(name, JSON.stringify(serialized))
+      // Serialize Decimals to {__decimal: "123"} format before saving
+      const serialized = serializeDecimals(value)
+      const jsonString = JSON.stringify(serialized)
+
+      // Log storage size for debugging
+      const sizeInMB = (jsonString.length / (1024 * 1024)).toFixed(2)
+      console.log(`💾 Saving to localStorage: ${sizeInMB} MB`)
+
+      localStorage.setItem(name, jsonString)
     } catch (error) {
-      console.error('❌ Error saving to storage:', error)
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.error('❌ localStorage quota exceeded! Data is too large to save.')
+        console.error('💡 Tip: Large Monte Carlo results are automatically excluded from persistence.')
+        console.error('   Summary statistics (percentiles, median, success rate) are preserved.')
+      } else {
+        console.error('❌ Error saving to storage:', error)
+      }
     }
   },
   removeItem: (name: string): void => {
@@ -197,10 +211,11 @@ const store = create<CalculatorStore>()(
     {
       name: 'financial-calculator-storage',
       version: 1,
-      storage: createJSONStorage(() => decimalAwareStorage),
-      // Hydrate Decimals after loading from storage
+      // Use our custom storage directly (not wrapped in createJSONStorage)
+      // This way we control the serialization/deserialization of Decimals
+      storage: decimalAwareStorage,
+      // Validate rehydration after loading from storage
       onRehydrateStorage: () => (state, error) => {
-        // Handle rehydration errors
         if (error) {
           console.error('❌ Rehydration error:', error)
           if (typeof window !== 'undefined') {
@@ -215,36 +230,12 @@ const store = create<CalculatorStore>()(
         }
 
         if (state) {
-          try {
-            console.log('🔄 Starting Decimal hydration...')
-
-            // Check state before hydration
-            if ((state as any).investmentProjection?.inputs?.equities) {
-              const eq = (state as any).investmentProjection.inputs.equities
-              console.log('Before hydration - equities type:', typeof eq, 'isDecimal:', eq instanceof Decimal, 'value:', eq)
-            }
-
-            // Recursively hydrate all Decimal values IN PLACE
-            // This mutates the state object directly to convert {__decimal: "123"} to Decimal objects
-            hydrateDecimalsInPlace(state)
-
-            // Check state after hydration
-            if ((state as any).investmentProjection?.inputs?.equities) {
-              const eq = (state as any).investmentProjection.inputs.equities
-              console.log('After hydration - equities type:', typeof eq, 'isDecimal:', eq instanceof Decimal, 'value:', eq)
-            }
-
-            console.log('✅ Successfully rehydrated calculator state with Decimal objects')
-          } catch (hydrateError) {
-            console.error('❌ Error hydrating Decimals:', hydrateError)
-            if (typeof window !== 'undefined') {
-              try {
-                localStorage.removeItem('financial-calculator-storage')
-                console.log('✅ Cleared corrupt data - please refresh')
-              } catch (e) {
-                console.error('Failed to clear storage:', e)
-              }
-            }
+          // Validate that Decimals were properly hydrated
+          const balance = (state as any).investmentProjection?.inputs?.currentBalance
+          if (balance instanceof Decimal) {
+            console.log('✅ State rehydrated successfully with Decimal objects')
+          } else {
+            console.error('❌ Decimal hydration failed - currentBalance type:', typeof balance, balance)
           }
         }
       },
@@ -259,6 +250,13 @@ const store = create<CalculatorStore>()(
           ...state.monteCarlo,
           isRunning: false, // Don't persist running state
           progress: 0, // Don't persist progress
+          // Exclude large result arrays that exceed localStorage quota (5-10MB limit)
+          // With 1M iterations, allFinalBalances contains 1M+ Decimal objects (~30MB+)
+          // The UI only needs percentile data for charts, not the raw distribution
+          results: state.monteCarlo.results ? {
+            ...state.monteCarlo.results,
+            allFinalBalances: [], // Empty array - saves ~95% storage space
+          } : null,
         },
         narrative: state.narrative,
       }),
